@@ -102,7 +102,12 @@ def parse_args():
     ud_root = str(Path.home() / "data" / "ud-treebank-v2.5")
     p = ArgumentParser()
     p.add_argument("--ud-dir", type=str, default=ud_root)
-    p.add_argument("--tasks_file", default=None, type=str, help="TSV file with the list of tasks to generate")
+    p.add_argument(
+        "--tasks_file",
+        default=None,
+        type=str,
+        help="TSV file with the list of tasks to generate",
+    )
     p.add_argument("-t", "--tags", type=str, nargs="*")
     p.add_argument("-l", "--languages", type=str, nargs="*")
     p.add_argument("-p", "--pos", type=str, nargs="*")
@@ -138,9 +143,7 @@ def load_train_dev_test(dirs, maxlen, minlen):
         data_files = find_conllu_files(subdir)
         for fn in data_files:
             split = fn.split("-")[-1][: -len(".conllu")]
-            for sentence in load_conllu_file(
-                subdir / fn, skip_word_pieces=True
-            ):
+            for sentence in load_conllu_file(subdir / fn, skip_word_pieces=True):
                 if len(sentence) >= minlen and len(sentence) <= maxlen:
                     data[split].append(sentence)
     return data
@@ -199,9 +202,7 @@ def filter_rare_tags(data, min_size):
     rare = set(k for k, v in tag_freq.items() if v < min_size)
     if rare:
         logging.warning(f"Filtering rare tags: {', '.join(rare)}")
-        logging.warning(
-            f"Remaining tags are: {', '.join(set(tag_freq.keys()) - rare)}"
-        )
+        logging.warning(f"Remaining tags are: {', '.join(set(tag_freq.keys()) - rare)}")
         filtered_data = {"train": [], "dev": [], "test": []}
         for split, sentences in data.items():
             for sentence in sentences:
@@ -308,9 +309,7 @@ def sample_pairs_from_single_dataset(data, size):
 
     S = len(data)
     if S * (S - 1) / 2 < size:
-        logging.warning(
-            f"Not enough samples, reducing size {size}-->{S * (S - 1) / 2}"
-        )
+        logging.warning(f"Not enough samples, reducing size {size}-->{S * (S - 1) / 2}")
         size = int(S * (S - 1) / 2)
 
     class_no = len(tag_mapping)
@@ -399,10 +398,14 @@ def save_dataset(sentences, outdir, include_pos=False):
         with open(fn, "w") as f:
             for sentence in this_split:
                 if include_pos:
-                    sentence_txt = " ".join(f"{t.form}_{t.upos}" for t in sentence.sentence.tokens)
+                    sentence_txt = " ".join(
+                        f"{t.form}_{t.upos}" for t in sentence.sentence.tokens
+                    )
                 else:
                     sentence_txt = " ".join(t.form for t in sentence.sentence.tokens)
-                f.write(f"{sentence_txt}\t{sentence.focus_word}\t{sentence.focus_idx}\t{sentence.value}\n")
+                f.write(
+                    f"{sentence_txt}\t{sentence.focus_word}\t{sentence.focus_idx}\t{sentence.value}\n"
+                )
 
 
 def load_tasks(args):
@@ -410,8 +413,10 @@ def load_tasks(args):
         tasks = pd.read_table(args.tasks_file, sep="\t")
     else:
         tasks = []
-        tasks = pd.DataFrame(product(args.languages, args.pos, args.tags),
-                     columns=["language", "pos", "tag"])
+        tasks = pd.DataFrame(
+            product(args.languages, args.pos, args.tags),
+            columns=["language", "pos", "tag"],
+        )
         tasks["task"] = tasks["tag"] + "_" + tasks["pos"]
     return tasks
 
@@ -516,9 +521,7 @@ def main():
                 dataset, args.train_size, args.dev_size, args.max_class_ratio
             )
             if sentences:
-                save_dataset(
-                    sentences, outdir, include_pos=args.include_pos
-                )
+                save_dataset(sentences, outdir, include_pos=args.include_pos)
     if args.stats_only:
         stats = pd.DataFrame(stats)
         stats.to_csv(stdout, sep="\t", index=False)
