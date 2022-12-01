@@ -489,18 +489,18 @@ def main():
             task = row["task"]
             cnt += 1
             logging.info(
-                f"{cnt} / {len(tasks)} Creating <{language},{pos},{task}> dataset"
+                f"{cnt} / {len(tasks)} Creating <{language},{pos},{tag}> dataset"
             )
             outdir = Path(args.outdir) / task.lower() / language
             data = find_focus_words(full_data, tag, pos=pos, disambig="all")
             data, tags = filter_rare_tags(data, args.rare_filter)
             if any(len(d) < 100 for d in data.values()):
                 logging.info(
-                    f"Too few samples for <{language},{pos},{task}> - skipping."
+                    f"Too few samples for <{language},{pos},{tag}> - skipping."
                 )
                 continue
             if len(tags) < 2:
-                logging.info(f"Only one class left, skipping <{language},{pos},{task}>")
+                logging.info(f"Only one class left, skipping <{language},{pos},{tag}>")
             if args.stats_only:
                 st = compute_label_entropy(data)
                 d = {
