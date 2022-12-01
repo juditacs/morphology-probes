@@ -6,9 +6,7 @@
 # Distributed under terms of the MIT license.
 
 from argparse import ArgumentParser
-import os
 import logging
-import pathlib
 import numpy as np
 from collections import defaultdict
 import pandas as pd
@@ -16,7 +14,7 @@ from sys import stdout
 from pathlib import Path
 from itertools import product
 
-from conllu import load_conllu_file, is_ok, find_conllu_files, read_sentences
+from conllu import load_conllu_file, is_ok, find_conllu_files
 
 
 class SampledDataset:
@@ -101,7 +99,7 @@ class SampleSentence:
 
 
 def parse_args():
-    ud_root = os.path.join(os.environ["HOME"], "data", "ud-treebanks-v2.5")
+    ud_root = str(Path.home() / "data" / "ud-treebank-v2.5")
     p = ArgumentParser()
     p.add_argument("--ud-dir", type=str, default=ud_root)
     p.add_argument("--tasks_file", default=None, type=str, help="TSV file with the list of tasks to generate")
@@ -137,11 +135,11 @@ def parse_args():
 def load_train_dev_test(dirs, maxlen, minlen):
     data = {"train": [], "dev": [], "test": []}
     for subdir in dirs:
-        data_files = find_conllu_files(subdir.path)
+        data_files = find_conllu_files(subdir)
         for fn in data_files:
             split = fn.split("-")[-1][: -len(".conllu")]
             for sentence in load_conllu_file(
-                os.path.join(subdir.path, fn), skip_word_pieces=True
+                subdir / fn, skip_word_pieces=True
             ):
                 if len(sentence) >= minlen and len(sentence) <= maxlen:
                     data[split].append(sentence)
@@ -150,7 +148,7 @@ def load_train_dev_test(dirs, maxlen, minlen):
 
 def find_valid_ud_dirs(ud_root, languages):
     ud_dirs = defaultdict(set)
-    for fn in os.scandir(ud_root):
+    for fn in Path(ud_root).iterdir():
         language = fn.name[3:].split("-")[0]
         if language == "Norwegian":
             if "Bokmaal" in fn.name:
@@ -159,7 +157,7 @@ def find_valid_ud_dirs(ud_root, languages):
                 language = "Norwegian_Nynorsk"
         if language not in languages:
             continue
-        if is_ok(fn.path):
+        if is_ok(fn):
             ud_dirs[language].add(fn)
     return ud_dirs
 
@@ -200,9 +198,9 @@ def filter_rare_tags(data, min_size):
             tag_freq[sentence.value] += 1
     rare = set(k for k, v in tag_freq.items() if v < min_size)
     if rare:
-        logging.warning("Filtering rare tags: {}".format(", ".join(rare)))
+        logging.warning(f"Filtering rare tags: {', '.join(rare)}")
         logging.warning(
-            "Remaining tags are: {}".format(", ".join(set(tag_freq.keys()) - rare))
+            f"Remaining tags are: {', '.join(set(tag_freq.keys()) - rare)}"
         )
         filtered_data = {"train": [], "dev": [], "test": []}
         for split, sentences in data.items():
@@ -311,7 +309,7 @@ def sample_pairs_from_single_dataset(data, size):
     S = len(data)
     if S * (S - 1) / 2 < size:
         logging.warning(
-            "Not enough samples, reducing size {}-->{}".format(size, S * (S - 1) / 2)
+            f"Not enough samples, reducing size {size}-->{S * (S - 1) / 2}"
         )
         size = int(S * (S - 1) / 2)
 
@@ -322,9 +320,7 @@ def sample_pairs_from_single_dataset(data, size):
     skip_class = set()
     while minval * (minval - 1) / 2 <= class_min:
         logging.info(
-            "Class {} is small ({}), using all possible combinations".format(
-                mintag, minval
-            )
+            f"Class {mintag} is small ({minval}), using all possible combinations"
         )
         skip_class.add(mintag)
         for l in tag_mapping[mintag]:
@@ -385,10 +381,9 @@ def sample_sentences(dataset, train_size, dev_size, max_class_ratio):
     for split, data in dataset.items():
         if len(data) < sizes[split]:
             logging.warning(
-                "Not enough samples in {}, discarding task".format(split, len(data))
+                f"Not enough samples in {split} ({len(data)}), discarding task"
             )
             return None
-            pairs[split] = data.get_all_samples(max_class_ratio)
         else:
             pairs[split] = data.get_balanced_random_samples(
                 sizes[split], max_class_ratio
@@ -397,33 +392,17 @@ def sample_sentences(dataset, train_size, dev_size, max_class_ratio):
 
 
 def save_dataset(sentences, outdir, include_pos=False):
-    pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
+    Path(outdir).mkdir(parents=True, exist_ok=True)
     for split, this_split in sentences.items():
-        fn = os.path.join(outdir, "{}.tsv".format(split))
+        fn = Path(outdir) / f"{split}.tsv"
         np.random.shuffle(this_split)
         with open(fn, "w") as f:
             for sentence in this_split:
                 if include_pos:
-                    f.write(
-                        "{}\t{}\t{}\t{}\n".format(
-                            " ".join(
-                                "{}_{}".format(t.form, t.upos)
-                                for t in sentence.sentence.tokens
-                            ),
-                            sentence.focus_word,
-                            sentence.focus_idx,
-                            sentence.value,
-                        )
-                    )
+                    sentence_txt = " ".join(f"{t.form}_{t.upos}" for t in sentence.sentence.tokens)
                 else:
-                    f.write(
-                        "{}\t{}\t{}\t{}\n".format(
-                            " ".join(t.form for t in sentence.sentence.tokens),
-                            sentence.focus_word,
-                            sentence.focus_idx,
-                            sentence.value,
-                        )
-                    )
+                    sentence_txt = " ".join(t.form for t in sentence.sentence.tokens)
+                f.write(f"{sentence_txt}\t{sentence.focus_word}\t{sentence.focus_idx}\t{sentence.value}\n")
 
 
 def load_tasks(args):
@@ -507,7 +486,7 @@ def main():
             logging.info(
                 f"{cnt} / {len(tasks)} Creating <{language},{pos},{task}> dataset"
             )
-            outdir = Path(args.outdir) / task.lower() / language.lower()
+            outdir = Path(args.outdir) / task.lower() / language
             data = find_focus_words(full_data, tag, pos=pos, disambig="all")
             data, tags = filter_rare_tags(data, args.rare_filter)
             if any(len(d) < 100 for d in data.values()):
