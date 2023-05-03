@@ -26,4 +26,6 @@ The task is to predict the morphosyntactic tag of a token given its sentence con
 
 ![Task availability by language](/fig/heatmap_task_language_availability.png)
 
+# Running probing experiments
 
+The source code for running the experiments is available in the [probing](https://github.com/juditacs/probing) package.
